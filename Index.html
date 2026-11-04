@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>FutAR — protótipo</title>
+<style>
+:root{color-scheme:dark;--lime:#b8ff5c;--panel:rgba(10,18,16,.78)}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07110e;font-family:system-ui,-apple-system,sans-serif;color:white}
+#app{position:fixed;inset:0;background:#07110e}
+video,canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+video{transform:scaleX(1)}
+canvas{pointer-events:none} canvas.drawing{pointer-events:auto;touch-action:none;cursor:crosshair}
+#shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.52),transparent 28%,transparent 60%,rgba(0,0,0,.45));pointer-events:none}
+header{position:absolute;top:env(safe-area-inset-top,12px);left:0;right:0;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.brand{font-weight:900;letter-spacing:.08em;font-size:17px}.brand span{color:var(--lime)}
+.pill{border:1px solid #ffffff3d;background:var(--panel);padding:8px 11px;border-radius:999px;font-size:12px;backdrop-filter:blur(10px)}
+#stats{position:absolute;top:74px;left:14px;display:flex;gap:8px}
+.stat{background:var(--panel);border:1px solid #ffffff24;border-radius:14px;padding:9px 12px;min-width:74px;backdrop-filter:blur(10px)}
+.stat small{display:block;color:#c4d0ca;font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+.stat strong{font-size:21px}
+#message{position:absolute;top:145px;left:50%;transform:translateX(-50%);width:max-content;max-width:90%;text-align:center;background:var(--panel);padding:9px 14px;border-radius:999px;border:1px solid #ffffff24;font-size:13px}
+#quickTools{position:absolute;right:14px;top:132px;display:flex;flex-direction:column;gap:8px;align-items:stretch}
+.toolBtn{font-size:11px;padding:10px 11px;border-radius:12px;background:rgba(8,17,14,.84);min-width:92px}
+.toolBtn.recording{background:#ff554b;border-color:#ff554b;color:#fff}
+.toolBtn.active{background:var(--lime);border-color:var(--lime);color:#10200b}
+#bottom{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);left:14px;right:14px;display:grid;gap:10px}
+#controls{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+button{font:inherit;color:white;border:1px solid #ffffff38;background:rgba(8,17,14,.82);padding:12px 8px;border-radius:14px;font-weight:700;backdrop-filter:blur(12px)}
+button.primary{background:var(--lime);color:#10200b;border-color:var(--lime)}
+button:disabled{opacity:.45}
+#startPanel{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(180deg,rgba(4,12,9,.6),rgba(4,12,9,.88))}
+.panel{width:min(440px,100%);background:#0d1915f2;border:1px solid #ffffff26;border-radius:24px;padding:24px;box-shadow:0 20px 80px #0008}
+.panel h1{margin:0 0 8px;font-size:29px;line-height:1.05}.panel h1 span{color:var(--lime)}
+.panel p{color:#c4d0ca;font-size:14px;line-height:1.5}
+.panel ul{padding-left:20px;color:#e7eee9;font-size:13px;line-height:1.65}
+.panel button{width:100%;margin-top:8px;padding:15px}
+#hint{font-size:11px!important;color:#9caaa2!important}
+.hidden{display:none!important}
+#cameraError{font-size:12px;color:#ffb4a9}
+</style>
+</head>
+<body>
+<div id="app">
+  <video id="video" playsinline muted autoplay></video>
+  <canvas id="canvas"></canvas><div id="shade"></div>
+  <header><div class="brand">FUT<span>AR</span></div><div id="status" class="pill">Câmera desligada</div></header>
+  <div id="stats">
+    <div class="stat"><small>Toques</small><strong id="touches">0</strong></div>
+    <div class="stat"><small>Gols</small><strong id="goals">0</strong></div>
+    <div class="stat"><small>Modo</small><strong id="modeLabel">Livre</strong></div>
+  </div>
+  <div id="message">Coloca o celular apoiado e aparece inteiro na câmera</div>
+  <div id="quickTools">
+    <button id="recordBtn" class="toolBtn" aria-label="Gravar">⏺ Gravar</button>
+    <button id="drawGoalBtn" class="toolBtn" aria-label="Desenhar gol">✎ Desenhar gol</button>
+  </div>
+  <div id="bottom">
+    <div id="controls">
+      <button id="freeBtn" class="primary">⚽ Livre</button>
+      <button id="juggleBtn">↕ Embaixadinhas</button>
+      <button id="goalBtn">🥅 Chutes ao gol</button>
+    </div>
+    <button id="resetBtn">Reiniciar rodada</button>
+  </div>
+  <div id="startPanel">
+    <div class="panel">
+      <div class="brand">FUT<span>AR</span> · PROTÓTIPO 0.1</div>
+      <h1>Joga bola no<br><span>mundo real.</span></h1>
+      <p>Uma primeira versão experimental: câmera traseira, rastreamento do corpo e uma bola virtual com física simples.</p>
+      <ul>
+        <li>Detecta tornozelos e pés pela câmera.</li>
+        <li>Experimenta toques, embaixadinhas e chutes.</li>
+        <li>Modo de gol com alvo virtual e pontuação.</li>
+      <li>Botão para gravar a sessão e ferramenta para desenhar o gol na tela.</li>
+      </ul>
+      <p id="hint">Para funcionar, abra esta página por um endereço HTTPS no Safari e permita o acesso à câmera. Deixe o iPhone apoiado, na horizontal ou vertical, a alguns metros de distância e com corpo e pés visíveis.</p>
+      <div id="cameraError"></div>
+      <button id="startBtn" class="primary">Ligar câmera e começar</button>
+    </div>
+  </div>
+</div>
+<script type="module">
+import { FilesetResolver, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22";
+
+const video=document.querySelector('#video'), canvas=document.querySelector('#canvas'), ctx=canvas.getContext('2d');
+const startPanel=document.querySelector('#startPanel'), startBtn=document.querySelector('#startBtn');
+const statusEl=document.querySelector('#status'), messageEl=document.querySelector('#message'), cameraError=document.querySelector('#cameraError');
+const touchesEl=document.querySelector('#touches'), goalsEl=document.querySelector('#goals'), modeLabel=document.querySelector('#modeLabel');
+let poseLandmarker, stream, running=false, mode='free', lastTime=0, lastTouch=0, touches=0, goals=0, lastFoot=null, lastKickAt=0;
+let ball={x:0,y:0,vx:0,vy:0,r:22,z:0,vz:0,grounded:true};
+let goal={x:0,y:0,w:0,h:0};
+let recording=false, mediaRecorder=null, recordedChunks=[], drawingGoal=false, goalStart=null, customGoal=false;
+let compositeStream=null;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function resize(){canvas.width=window.innerWidth*devicePixelRatio;canvas.height=window.innerHeight*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);if(!ball.x){ball.x=innerWidth*.5;ball.y=innerHeight*.78;}}
+window.addEventListener('resize',resize);resize();
+function say(t){messageEl.textContent=t}
+function setMode(m){mode=m;modeLabel.textContent=m==='free'?'Livre':m==='juggle'?'Embaix.':'Chutes';document.querySelectorAll('#controls button').forEach(b=>b.classList.remove('primary'));document.querySelector(m==='free'?'#freeBtn':m==='juggle'?'#juggleBtn':'#goalBtn').classList.add('primary');say(m==='free'?'Toque na bola virtual com o pé.':m==='juggle'?'Tenta manter a bola no ar!':'Chuta a bola na direção do gol virtual!');}
+document.querySelector('#freeBtn').onclick=()=>setMode('free');
+document.querySelector('#juggleBtn').onclick=()=>setMode('juggle');
+document.querySelector('#goalBtn').onclick=()=>{setMode('goal');};
+document.querySelector('#resetBtn').onclick=()=>{touches=0;goals=0;touchesEl.textContent='0';goalsEl.textContent='0';customGoal=false;setDrawing(false);ball={x:innerWidth*.5,y:innerHeight*.78,vx:0,vy:0,r:22,z:0,vz:0,grounded:true};say('Rodada reiniciada. Bora!');};
+function drawCameraBackground(){
+ if(video.readyState<2)return;
+ const vw=video.videoWidth, vh=video.videoHeight, cw=innerWidth, ch=innerHeight;
+ if(!vw||!vh)return;
+ // Cover the screen while preserving the camera aspect ratio.
+ const scale=Math.max(cw/vw,ch/vh), dw=vw*scale, dh=vh*scale;
+ ctx.drawImage(video,(cw-dw)/2,(ch-dh)/2,dw,dh);
+}
+function drawGoal(){
+ if(!customGoal){
+   const w=innerWidth*.46,h=innerHeight*.17,x=(innerWidth-w)/2,y=innerHeight*.20;
+   goal={x,y,w,h};
+ }
+ const {x,y,w,h}=goal;
+ ctx.save();ctx.lineWidth=5;ctx.strokeStyle='#f5fff8';ctx.shadowColor='#b8ff5c';ctx.shadowBlur=9;
+ ctx.beginPath();ctx.moveTo(x,y+h);ctx.lineTo(x,y);ctx.lineTo(x+w,y);ctx.lineTo(x+w,y+h);ctx.stroke();
+ ctx.shadowBlur=0;ctx.lineWidth=1.3;ctx.strokeStyle='rgba(255,255,255,.5)';
+ for(let i=1;i<6;i++){ctx.beginPath();ctx.moveTo(x+w*i/6,y);ctx.lineTo(x+w*i/6,y+h);ctx.stroke();}
+ for(let i=1;i<4;i++){ctx.beginPath();ctx.moveTo(x,y+h*i/4);ctx.lineTo(x+w,y+h*i/4);ctx.stroke();}
+ ctx.restore();
+}
+function drawBall(){
+ const groundY=ball.y;
+ const shadowScale=clamp(1-ball.z/180,.35,1);
+ ctx.save();
+ ctx.fillStyle=`rgba(0,0,0,${.30*shadowScale})`;ctx.beginPath();ctx.ellipse(ball.x,groundY+ball.r*.62,ball.r*1.1*shadowScale,ball.r*.35*shadowScale,0,0,Math.PI*2);ctx.fill();
+ const by=groundY-ball.z;
+ const grad=ctx.createRadialGradient(ball.x-ball.r*.35,by-ball.r*.4,2,ball.x,by,ball.r*1.25);
+ grad.addColorStop(0,'#ffffff');grad.addColorStop(.42,'#e8f2e9');grad.addColorStop(1,'#68766d');
+ ctx.fillStyle=grad;ctx.beginPath();ctx.arc(ball.x,by,ball.r,0,Math.PI*2);ctx.fill();
+ ctx.strokeStyle='#26332b';ctx.lineWidth=2;ctx.stroke();
+ ctx.fillStyle='#26332b';ctx.beginPath();
+ for(let i=0;i<5;i++){let a=i*Math.PI*2/5-Math.PI/2,px=ball.x+Math.cos(a)*ball.r*.42,py=by+Math.sin(a)*ball.r*.42;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);}ctx.closePath();ctx.fill();
+ ctx.restore();
+}
+function drawFeet(landmarks){
+ if(!landmarks)return [];
+ const ids=[27,28,29,30,31,32], pts=[];
+ for(const i of ids){const p=landmarks[i];if(p&&p.visibility>.28){pts.push({x:p.x*innerWidth,y:p.y*innerHeight,vis:p.visibility,id:i});}}
+ ctx.save();for(const p of pts){ctx.beginPath();ctx.arc(p.x,p.y,7,0,Math.PI*2);ctx.fillStyle='#b8ff5c';ctx.fill();ctx.strokeStyle='#10200b';ctx.lineWidth=2;ctx.stroke();}ctx.restore();
+ return pts;
+}
+function updatePhysics(dt){
+ const sec=Math.min(dt/1000,.04);
+ ball.vy+=760*sec;ball.x+=ball.vx*sec;ball.y+=ball.vy*sec;ball.z+=ball.vz*sec;ball.vz-=1100*sec;
+ if(ball.z<0){ball.z=0;ball.vz=0;if(Math.abs(ball.vy)>110){ball.vy=-Math.abs(ball.vy)*.35;}else{ball.vy=0;ball.grounded=true;}}
+ ball.vx*=Math.pow(.985,sec*60);ball.vy*=Math.pow(.985,sec*60);
+ if(ball.x<ball.r||ball.x>innerWidth-ball.r){ball.x=clamp(ball.x,ball.r,innerWidth-ball.r);ball.vx*=-.55;}
+ if(ball.y>innerHeight-ball.r-15){ball.y=innerHeight-ball.r-15;if(ball.vy>0)ball.vy*=-.35;}
+ if(mode==='goal'&&ball.z>35&&ball.x>goal.x&&ball.x<goal.x+goal.w&&ball.y-ball.z>goal.y&&ball.y-ball.z<goal.y+goal.h&&Date.now()-lastKickAt<1700){
+   goals++;goalsEl.textContent=goals;lastKickAt=0;say('GOOOOL! ⚽');ball.vx=0;ball.vy=0;ball.vz=0;ball.z=0;ball.x=innerWidth*.5;ball.y=innerHeight*.78;
+ }
+}
+function detectTouch(pts,now){
+ if(!pts.length)return;
+ // Use the lowest visible foot landmarks; approximate camera-plane contact, not true 3D collision.
+ let nearest=null,dist=Infinity;
+ for(const p of pts){const d=Math.hypot(p.x-ball.x,p.y-(ball.y-ball.z));if(d<dist){dist=d;nearest=p;}}
+ if(!nearest)return;
+ let speed=0;
+ if(lastFoot){speed=Math.hypot(nearest.x-lastFoot.x,nearest.y-lastFoot.y);}
+ if(dist<Math.max(45,ball.r+24)&&now-lastTouch>420){
+   lastTouch=now;touches++;touchesEl.textContent=touches;
+   const dx=nearest.x-ball.x,dy=(ball.y-ball.z)-nearest.y;
+   const len=Math.max(1,Math.hypot(dx,dy));
+   const power=clamp(speed*2.2,170,650);
+   ball.vx=clamp((dx/len)*power+((nearest.x-innerWidth/2)*.45),-540,540);
+   ball.vy=mode==='juggle'?-Math.max(260,power*.65):-Math.max(170,power*.6);
+   ball.vz=mode==='juggle'?Math.max(400,power*.8):Math.max(220,power*.45);
+   ball.grounded=false;
+   if(mode==='goal')lastKickAt=Date.now();
+   say(mode==='juggle'?'Toque! Mantém a sequência!':mode==='goal'?'Chute detectado — mira no gol!':'Toque detectado!');
+ }
+ lastFoot={x:nearest.x,y:nearest.y};
+}
+let lastLandmarks=null;
+async function frame(now){
+ if(!running)return;
+ if(canvas.width!==Math.round(innerWidth*devicePixelRatio)||canvas.height!==Math.round(innerHeight*devicePixelRatio))resize();
+ ctx.clearRect(0,0,innerWidth,innerHeight);
+ drawCameraBackground();
+ if(mode==='goal'||customGoal)drawGoal();
+ if(poseLandmarker&&video.readyState>=2){
+   const result=poseLandmarker.detectForVideo(video,now);
+   lastLandmarks=result.landmarks?.[0]||null;
+   const pts=drawFeet(lastLandmarks);
+   if(pts.length)detectTouch(pts,now);
+ }
+ updatePhysics(now-lastTime||16);lastTime=now;
+ drawBall();
+ requestAnimationFrame(frame);
+}
+
+const recordBtn=document.querySelector('#recordBtn');
+const drawGoalBtn=document.querySelector('#drawGoalBtn');
+function setDrawing(on){
+ drawingGoal=on;
+ canvas.classList.toggle('drawing',on);
+ drawGoalBtn.classList.toggle('active',on);
+ drawGoalBtn.textContent=on?'✕ Cancelar desenho':'✎ Desenhar gol';
+ if(on)say('Arrasta o dedo na tela para desenhar os quatro lados do gol.');
+ else if(customGoal)say('Gol personalizado pronto! Escolhe Chutes ao gol.');
+}
+drawGoalBtn.addEventListener('click',()=>{
+ if(!running){say('Liga a câmera primeiro.');return;}
+ setDrawing(!drawingGoal);
+});
+function canvasPoint(e){
+ const r=canvas.getBoundingClientRect();
+ return {x:e.clientX-r.left,y:e.clientY-r.top};
+}
+canvas.addEventListener('pointerdown',e=>{
+ if(!drawingGoal)return;
+ e.preventDefault();canvas.setPointerCapture(e.pointerId);
+ goalStart=canvasPoint(e);
+ goal={x:goalStart.x,y:goalStart.y,w:1,h:1};
+ customGoal=true;
+});
+canvas.addEventListener('pointermove',e=>{
+ if(!drawingGoal||!goalStart)return;
+ const p=canvasPoint(e);
+ goal={x:Math.min(goalStart.x,p.x),y:Math.min(goalStart.y,p.y),w:Math.abs(p.x-goalStart.x),h:Math.abs(p.y-goalStart.y)};
+});
+canvas.addEventListener('pointerup',e=>{
+ if(!drawingGoal||!goalStart)return;
+ const p=canvasPoint(e);
+ goal={x:Math.min(goalStart.x,p.x),y:Math.min(goalStart.y,p.y),w:Math.max(50,Math.abs(p.x-goalStart.x)),h:Math.max(35,Math.abs(p.y-goalStart.y))};
+ customGoal=true;goalStart=null;setDrawing(false);setMode('goal');
+});
+recordBtn.addEventListener('click',()=>{
+ if(!running){say('Liga a câmera primeiro.');return;}
+ if(recording){
+   mediaRecorder?.stop();
+   return;
+ }
+ try{
+   if(!canvas.captureStream||!window.MediaRecorder)throw new Error('Este navegador não oferece gravação compatível.');
+   compositeStream=canvas.captureStream(30);
+   // Include camera audio only if an audio track exists (normally none in this prototype).
+   mediaRecorder=new MediaRecorder(compositeStream);
+   recordedChunks=[];
+   mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)recordedChunks.push(e.data);};
+   mediaRecorder.onstop=()=>{
+     const blob=new Blob(recordedChunks,{type:mediaRecorder.mimeType||'video/webm'});
+     const url=URL.createObjectURL(blob), a=document.createElement('a');
+     a.href=url;a.download='futar-sessao.webm';document.body.appendChild(a);a.click();a.remove();
+     setTimeout(()=>URL.revokeObjectURL(url),1500);
+     if(compositeStream)compositeStream.getTracks().forEach(t=>t.stop());
+     recording=false;recordBtn.classList.remove('recording');recordBtn.textContent='⏺ Gravar';say('Gravação pronta — confere os Arquivos/Downloads.');
+   };
+   mediaRecorder.start();recording=true;recordBtn.classList.add('recording');recordBtn.textContent='■ Parar';say('Gravando a tela do jogo…');
+ }catch(e){say('Não foi possível gravar neste navegador: '+e.message);}
+});
+
+async function start(){
+ startBtn.disabled=true;cameraError.textContent='';
+ try{
+   if(!navigator.mediaDevices?.getUserMedia)throw new Error('Este navegador não liberou a câmera. Abra em Safari por HTTPS.');
+   stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});
+   video.srcObject=stream;await video.play();
+   statusEl.textContent='Carregando rastreamento…';
+   const vision=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm');
+   poseLandmarker=await PoseLandmarker.createFromOptions(vision,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',delegate:'GPU'},runningMode:'VIDEO',numPoses:1,minPoseDetectionConfidence:.45,minPosePresenceConfidence:.45,minTrackingConfidence:.45});
+   running=true;startPanel.classList.add('hidden');statusEl.textContent='Câmera ativa';video.style.visibility='hidden';say('Afasta o celular até aparecerem teus pés.');requestAnimationFrame(frame);
+ }catch(e){
+   console.error(e);cameraError.textContent='Não deu para iniciar: '+(e.message||e)+'. Confere a permissão da câmera e a conexão com a internet.';
+   if(stream)stream.getTracks().forEach(t=>t.stop());startBtn.disabled=false;statusEl.textContent='Câmera desligada';
+ }
+}
+startBtn.addEventListener('click',start);
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&stream)stream.getTracks().forEach(t=>t.stop());});
+</script>
+</body>
+</html>
